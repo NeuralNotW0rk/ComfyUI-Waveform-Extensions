@@ -1,20 +1,35 @@
 import torch
 import numpy as np
-import importlib, subprocess, sys
+import importlib
+import subprocess
+import sys
 
 
-class JoinAudio():
+def hijack_import(importname, installname):
+    try:
+        importlib.import_module(importname)
+    except ModuleNotFoundError:
+        print(f"Import failed for {importname}, Installing {installname}")
+        subprocess.check_call([sys.executable, "-m", "pip", "install", installname])
+
+
+hijack_import("librosa", "librosa")
+
+import librosa.effects
+
+
+class JoinAudio:
     @classmethod
     def INPUT_TYPES(cls):
         return {
             "required": {
                 "tensor_1": ("AUDIO", ),
                 "tensor_2": ("AUDIO", ),
-                "gap": ("INT", {"default": 0, "min": -1000000000, "max": 1000000000, "step": 1}),
+                "gap": ("INT", {"default": 0, "min": -1e9, "max": 1e9, "step": 1}),
                 "overlap_method": (("overwrite", "linear", "sigmoid"), {"default": "sigmoid"})
                 },
             "optional": {
-                "sample_rate": ("INT", {"default": 44100, "min": 1, "max": 10000000000, "step": 1, "forceInput": True}),
+                "sample_rate": ("INT", {"default": 44100, "min": 1, "max": 1e9, "step": 1, "forceInput": True}),
                 },
             }
 
@@ -49,8 +64,59 @@ class JoinAudio():
         return joined_tensor, sample_rate
 
 
+class StretchAudio:
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "tensor": ("AUDIO", ),
+                "rate": ("FLOAT", {"default": 1.0, "min": 1e-9, "max": 1e9, "step": 0.1})
+                },
+            "optional": {
+                "sample_rate": ("INT", {"default": 44100, "min": 1, "max": 1e9, "step": 1, "forceInput": True}),
+                },
+            }
+
+    RETURN_TYPES = ("AUDIO", "INT")
+    RETURN_NAMES = ("tensor", "sample_rate")
+    FUNCTION = "stretch_audio"
+
+    CATEGORY = "Audio/Waveform"
+
+    def stretch_audio(self, tensor, rate, sample_rate):
+        y = tensor.cpu().numpy()
+        y = librosa.effects.time_stretch(y, rate=rate)
+        tensor_out = torch.from_numpy(y).to(device=tensor.device)
+
+        return tensor_out, sample_rate
+
+
+class ReverseAudio:
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "tensor": ("AUDIO",),
+            },
+            "optional": {
+                "sample_rate": ("INT", {"default": 44100, "min": 1, "max": 1e9, "step": 1, "forceInput": True}),
+            },
+        }
+
+    RETURN_TYPES = ("AUDIO", "INT")
+    RETURN_NAMES = ("tensor", "sample_rate")
+    FUNCTION = "reverse_audio"
+
+    CATEGORY = "Audio/Waveform"
+
+    def reverse_audio(self, tensor, sample_rate):
+        return torch.flip(tensor.clone(), (2,)), sample_rate
+
+
 NODE_CLASS_MAPPINGS = {
-    'JoinAudio': JoinAudio
+    'JoinAudio': JoinAudio,
+    'StretchAudio': StretchAudio,
+    'ReverseAudio': ReverseAudio
 }
 
 
