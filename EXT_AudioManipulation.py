@@ -17,6 +17,10 @@ hijack_import("librosa", "librosa")
 
 import librosa.effects
 
+# -----------------
+# AUDIO ARRANGEMENT
+# -----------------
+
 
 class JoinAudio:
     @classmethod
@@ -34,10 +38,10 @@ class JoinAudio:
             }
 
     RETURN_TYPES = ("AUDIO", "INT")
-    RETURN_NAMES = ("tensor", "sample_rate")
+    RETURN_NAMES = ("joined_tensor", "sample_rate")
     FUNCTION = "join_audio"
 
-    CATEGORY = "Audio/Waveform"
+    CATEGORY = "Audio/Arrangement"
 
     def join_audio(self, tensor_1, tensor_2, gap, overlap_method, sample_rate):
         joined_length = tensor_1.size(2) + tensor_2.size(2) + gap
@@ -47,21 +51,74 @@ class JoinAudio:
 
         # Overlapping
         if gap < 0:
-            mask = np.zeros(abs(gap))
+            gap_abs = abs(gap)
+            mask = np.ones(gap_abs)
             if overlap_method == 'linear':
-                mask = np.linspace(0.0, 1.0, num=abs(gap))
+                mask = np.linspace(0.0, 1.0, num=gap_abs)
             elif overlap_method == 'sigmoid':
                 k = 6
-                mask = np.linspace(-1.0, 1.0, num=abs(gap))
+                mask = np.linspace(-1.0, 1.0, num=gap_abs)
                 mask = 1 / (1 + np.exp(-mask * k))
             mask = torch.from_numpy(mask).to(device=tensor_1.device)
-            tensor_1_masked[:, :, -abs(gap):] *= 1.0 - mask
-            tensor_2_masked[:, :, :abs(gap)] *= mask
+            tensor_1_masked[:, :, -gap_abs:] *= 1.0 - mask
+            tensor_2_masked[:, :, :gap_abs] *= mask
 
         joined_tensor[:, :, :tensor_1.size(2)] += tensor_1_masked
         joined_tensor[:, :, tensor_1.size(2) + gap:] += tensor_2_masked
 
         return joined_tensor, sample_rate
+
+
+class BatchJoinAudio:
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "batch_tensor": ("AUDIO",),
+                "gap": ("INT", {"default": 0, "min": -1e9, "max": 1e9, "step": 1}),
+                "overlap_method": (("overwrite", "linear", "sigmoid"), {"default": "sigmoid"})
+            },
+            "optional": {
+                "sample_rate": ("INT", {"default": 44100, "min": 1, "max": 1e9, "step": 1, "forceInput": True}),
+            },
+        }
+
+    RETURN_TYPES = ("AUDIO", "INT")
+    RETURN_NAMES = ("joined_tensor", "sample_rate")
+    FUNCTION = "batch_join_audio"
+
+    CATEGORY = "Audio/Arrangement"
+
+    def batch_join_audio(self, batch_tensor, gap, overlap_method, sample_rate):
+        joined_length = batch_tensor.size(2) * batch_tensor.size(0) + gap * (batch_tensor.size(0) - 1)
+        joined_tensor = torch.zeros((1, batch_tensor.size(1), joined_length), device=batch_tensor.device)
+        tensor_masked = batch_tensor.clone()
+
+        # Overlapping
+        if gap < 0:
+            gap_abs = abs(gap)
+            mask = np.ones(gap_abs)
+            if overlap_method == 'linear':
+                mask = np.linspace(0.0, 1.0, num=gap_abs)
+            elif overlap_method == 'sigmoid':
+                k = 6
+                mask = np.linspace(-1.0, 1.0, num=gap_abs)
+                mask = 1 / (1 + np.exp(-mask * k))
+            mask = torch.from_numpy(mask).to(device=batch_tensor.device)
+            tensor_masked[:-1, :, -gap_abs:] *= 1.0 - mask
+            tensor_masked[1:, :, :gap_abs] *= mask
+
+        for i, sample in enumerate(tensor_masked):
+            sample_start = (batch_tensor.size(2) + gap) * i
+            sample_end = sample_start + batch_tensor.size(2)
+            joined_tensor[:, :, sample_start:sample_end] += sample
+
+        return joined_tensor, sample_rate
+    
+
+# ------------------
+# AUDIO MANIPULATION
+# ------------------
 
 
 class StretchAudio:
@@ -81,7 +138,7 @@ class StretchAudio:
     RETURN_NAMES = ("tensor", "sample_rate")
     FUNCTION = "stretch_audio"
 
-    CATEGORY = "Audio/Waveform"
+    CATEGORY = "Audio/Manipulation"
 
     def stretch_audio(self, tensor, rate, sample_rate):
         y = tensor.cpu().numpy()
@@ -107,7 +164,7 @@ class ReverseAudio:
     RETURN_NAMES = ("tensor", "sample_rate")
     FUNCTION = "reverse_audio"
 
-    CATEGORY = "Audio/Waveform"
+    CATEGORY = "Audio/Manipulation"
 
     def reverse_audio(self, tensor, sample_rate):
         return torch.flip(tensor.clone(), (2,)), sample_rate
@@ -115,11 +172,7 @@ class ReverseAudio:
 
 NODE_CLASS_MAPPINGS = {
     'JoinAudio': JoinAudio,
+    'BatchJoinAudio': BatchJoinAudio,
     'StretchAudio': StretchAudio,
     'ReverseAudio': ReverseAudio
 }
-
-
-
-
-
