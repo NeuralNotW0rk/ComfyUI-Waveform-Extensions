@@ -17,6 +17,7 @@ hijack_import("librosa", "librosa")
 
 import librosa.effects
 
+
 # -----------------
 # AUDIO ARRANGEMENT
 # -----------------
@@ -116,6 +117,53 @@ class BatchJoinAudio:
         return joined_tensor, sample_rate
     
 
+class CutAudio:
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "tensor": ("AUDIO",),
+                "start": ("INT",),
+                "end": ("INT",),
+            },
+            "optional": {
+                "sample_rate": ("INT", {"default": 44100, "min": 1, "max": 1e9, "step": 1, "forceInput": True}),
+            },
+        }
+
+    RETURN_TYPES = ("AUDIO", "INT")
+    RETURN_NAMES = ("cut_tensor", "sample_rate")
+    FUNCTION = "cut_audio"
+
+    CATEGORY = "Audio/Arrangement"
+
+    def cut_audio(self, tensor, start, end, sample_rate):
+        return tensor.clone()[:, :, start:end], sample_rate
+
+
+class DuplicateAudio:
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "tensor": ("AUDIO",),
+                "count": ("INT", {"default": 1, "min": 1, "max": 1024, "step": 1}),
+            },
+            "optional": {
+                "sample_rate": ("INT", {"default": 44100, "min": 1, "max": 1e9, "step": 1, "forceInput": True}),
+            },
+        }
+
+    RETURN_TYPES = ("AUDIO", "INT")
+    RETURN_NAMES = ("out_tensor", "sample_rate")
+    FUNCTION = "duplicate_audio"
+
+    CATEGORY = "Audio/Arrangement"
+
+    def duplicate_audio(self, tensor, count, sample_rate):
+        return tensor.repeat(count, 1, 1), sample_rate
+
+
 # ------------------
 # AUDIO MANIPULATION
 # ------------------
@@ -170,9 +218,44 @@ class ReverseAudio:
         return torch.flip(tensor.clone(), (2,)), sample_rate
 
 
+class ResampleAudio:
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "tensor": ("AUDIO",),
+                "sample_rate": ("INT", {"default": 44100, "min": 1, "max": 1e9, "step": 1}),
+                "sample_rate_target": ("INT", {"default": 44100, "min": 1, "max": 1e9, "step": 1}),
+            },
+            "optional": {},
+        }
+
+    RETURN_TYPES = ("AUDIO", "INT")
+    RETURN_NAMES = ("out_tensor", "sample_rate")
+    FUNCTION = "resample_audio"
+
+    CATEGORY = "Audio/Manipulation"
+
+    def resample_audio(self, tensor, sample_rate, sample_rate_target):
+        y = tensor.cpu().numpy()
+        y = librosa.resample(y, sample_rate, sample_rate_target)
+        tensor_out = torch.from_numpy(y).to(device=tensor.device)
+
+        return tensor_out, sample_rate_target
+
+
+
+# --------
+# ENVELOPE
+# --------
+
+
 NODE_CLASS_MAPPINGS = {
     'JoinAudio': JoinAudio,
     'BatchJoinAudio': BatchJoinAudio,
+    'CutAudio': CutAudio,
+    'DuplicateAudio': DuplicateAudio,
     'StretchAudio': StretchAudio,
-    'ReverseAudio': ReverseAudio
+    'ReverseAudio': ReverseAudio,
+    'ResampleAudio': ResampleAudio
 }
