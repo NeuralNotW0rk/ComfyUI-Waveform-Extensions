@@ -1,0 +1,14 @@
+[project]
+name = "comfyui-waveform-extensions"
+description = ""
+version = "1.0.0"
+license = "LICENSE"
+
+[project.urls]
+Repository = "https://github.com/NeuralNotW0rk/ComfyUI-Waveform-Extensions"
+#  Used by Comfy Registry https://comfyregistry.org
+
+[tool.comfy]
+PublisherId = ""
+DisplayName = "ComfyUI-Waveform-Extensions"
+Icon = ""
