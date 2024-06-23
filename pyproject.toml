@@ -1,6 +1,6 @@
 [project]
 name = "comfyui-waveform-extensions"
-description = ""
+description = "Some additional audio utilites for use on top of Sample Diffusion ComfyUI Extension"
 version = "1.0.0"
 license = "LICENSE"
 
@@ -9,6 +9,6 @@ Repository = "https://github.com/NeuralNotW0rk/ComfyUI-Waveform-Extensions"
 #  Used by Comfy Registry https://comfyregistry.org
 
 [tool.comfy]
-PublisherId = ""
+PublisherId = "neural-not-work"
 DisplayName = "ComfyUI-Waveform-Extensions"
 Icon = ""
