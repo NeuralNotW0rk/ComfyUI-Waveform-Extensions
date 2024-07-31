@@ -2,7 +2,7 @@
 name = "comfyui-waveform-extensions"
 description = "Some additional audio utilites for use on top of Sample Diffusion ComfyUI Extension"
 version = "1.0.0"
-license = "LICENSE"
+license = { file = "LICENSE" }
 
 [project.urls]
 Repository = "https://github.com/NeuralNotW0rk/ComfyUI-Waveform-Extensions"
